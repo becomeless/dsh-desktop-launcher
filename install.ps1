@@ -2,7 +2,10 @@
 #  DeepSeek Harness Desktop Launcher —— 一键安装脚本
 #
 #  一行安装（PowerShell）：
-#    [Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install.ps1 | iex
+#    [Net.ServicePointManager]::SecurityProtocol='Tls12'; iex ([System.Text.Encoding]::UTF8.GetString((New-Object Net.WebClient).DownloadData('https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install.ps1')).TrimStart([char]0xFEFF))
+#
+#  （用字节下载 + 显式 UTF-8 解码，避免 PowerShell 5.1 对
+#    application/octet-stream 的 irm|iex 解码问题）
 #
 #  也可以下载本文件后右键「使用 PowerShell 运行」。
 #  默认安装到 %LOCALAPPDATA%\DeepSeek-Harness-Launcher（无需管理员权限），

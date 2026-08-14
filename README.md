@@ -19,18 +19,18 @@ Windows 桌面启动器 for [DeepSeek Harness](https://github.com/deepseek-ai/de
 **PowerShell（推荐）：**
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install.ps1 | iex
+[Net.ServicePointManager]::SecurityProtocol='Tls12'; iex ([System.Text.Encoding]::UTF8.GetString((New-Object Net.WebClient).DownloadData('https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install.ps1')).TrimStart([char]0xFEFF))
 ```
 
 **CMD：**
 
 ```cmd
-powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install.ps1 | iex"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol='Tls12'; iex ([System.Text.Encoding]::UTF8.GetString((New-Object Net.WebClient).DownloadData('https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install.ps1')).TrimStart([char]0xFEFF))"
 ```
 
 没装 Node.js 时，安装脚本会询问是否用 winget 自动安装；不想装也可以手动去 [nodejs.org](https://nodejs.org) 装好后重跑。
 
-> 国内访问 jsDelivr 不稳时，把命令里的 `cdn.jsdelivr.net/gh/...@main` 换成 `raw.githubusercontent.com/.../main` 即可（脚本内部也会自动回退）。
+> 国内访问 jsDelivr 不稳时，把命令里的 `https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install.ps1` 换成 `https://raw.githubusercontent.com/becomeless/dsh-desktop-launcher/main/install.ps1` 即可（安装脚本内部下载也会自动回退）。
 
 ## 📦 手动安装
 
@@ -103,7 +103,7 @@ DeepSeek-blue.ico    桌面图标
 One-liner install on Windows (PowerShell):
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install.ps1 | iex
+[Net.ServicePointManager]::SecurityProtocol='Tls12'; iex ([System.Text.Encoding]::UTF8.GetString((New-Object Net.WebClient).DownloadData('https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install.ps1')).TrimStart([char]0xFEFF))
 ```
 
 Double-click the desktop icon it creates → DeepSeek Harness starts silently and opens in a Chrome app window. Close the window to stop the server; sessions persist locally and resume next launch. Requires Windows 10/11, Node.js, and a DeepSeek API key (`DEEPSEEK_API_KEY` or the in-app model settings). Uninstall via `uninstall.ps1` in the install directory. Community tool, not affiliated with DeepSeek.
