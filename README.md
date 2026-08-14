@@ -12,7 +12,7 @@ Windows 与 macOS 的桌面启动器 for [DeepSeek Harness](https://github.com/d
 - 🧹 **关窗即停**：关闭应用窗口自动结束后台服务，不留残留进程
 - 🩺 **友好报错**：缺 Node.js / 启动失败都会弹窗提示，日志写 `%TEMP%\DSH-Server.log`
 - 🌐 **双浏览器**：优先 Chrome，没有自动回退 Edge
-- 🍎 **macOS 支持（Beta）**：同名 `.app` 版本，双击即用，逻辑与 Windows 版一致（欢迎 Mac 用户测试反馈）
+- 🍎 **macOS 支持**：同名 `.app` 版本，双击即用，逻辑与 Windows 版一致（已真机实测）
 - 🚫 无需管理员权限，安装目录 `%LOCALAPPDATA%\DeepSeek-Harness-Launcher`（macOS 为 `~/Library/Application Support/DeepSeek-Harness-Launcher`）
 
 ## 🚀 一键安装
@@ -31,7 +31,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager
 
 没装 Node.js 时，安装脚本会询问是否用 winget 自动安装；不想装也可以手动去 [nodejs.org](https://nodejs.org) 装好后重跑。
 
-**macOS（Beta）：**
+**macOS：**
 
 ```bash
 curl -fsSL https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install-macos.sh | bash
@@ -73,7 +73,7 @@ curl -fsSL https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/inst
 ## 🧱 系统要求
 
 - Windows 10 / 11
-- macOS 11+（Beta）
+- macOS 11+
 - [Node.js](https://nodejs.org)（提供 npx）
 - Chrome 或 Edge（Windows 自带 Edge；macOS 需自行安装其一）
 - 网络（首次运行自动下载 DeepSeek Harness）
@@ -86,9 +86,9 @@ curl -fsSL https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/inst
 
 **怎么更新？** 重新跑一遍安装命令即可（会覆盖安装目录并刷新图标）。
 
-**macOS 能用吗？** Beta 支持。作者在 Windows 环境开发，macOS 版未经真机测试；有问题欢迎提 issue 并附上日志（`$TMPDIR/DSH-Server.log`）。
+**macOS 能用吗？** 可以，已经社区真机测试通过；遇到问题欢迎提 issue 并附上日志（`$TMPDIR/DSH-Server.log`）。
 
-**和官方 DeepSeek Harness 什么关系？** 本工具只是官方的 Windows 桌面入口，启动的仍是官方 `npx @deepseek-ai/dsh web`，不修改、不替代官方任何组件。
+**和官方 DeepSeek Harness 什么关系？** 本工具只是官方的桌面入口，启动的仍是官方 `npx @deepseek-ai/dsh web`，不修改、不替代官方任何组件。
 
 ## 📁 项目结构
 
@@ -123,4 +123,4 @@ One-liner install on Windows (PowerShell):
 
 Double-click the desktop icon it creates → DeepSeek Harness starts silently and opens in a Chrome app window. Close the window to stop the server; sessions persist locally and resume next launch. Requires Windows 10/11, Node.js, and a DeepSeek API key (`DEEPSEEK_API_KEY` or the in-app model settings). Uninstall via `uninstall.ps1` in the install directory. Community tool, not affiliated with DeepSeek.
 
-macOS (beta): `curl -fsSL https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install-macos.sh | bash` — installs a double-clickable `.app` into Applications. Note: developed and tested on Windows; the macOS build needs community testing.
+macOS: `curl -fsSL https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install-macos.sh | bash` — installs a double-clickable `.app` into Applications (community-tested).
