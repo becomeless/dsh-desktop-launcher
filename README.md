@@ -31,13 +31,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager
 
 没装 Node.js 时，安装脚本会询问是否用 winget 自动安装；不想装也可以手动去 [nodejs.org](https://nodejs.org) 装好后重跑。
 
-**macOS：**
+**macOS（推荐 Homebrew）：**
+
+```bash
+brew tap becomeless/dsh-desktop-launcher
+brew install --cask dsh-desktop-launcher
+```
+
+或一行脚本安装：
 
 ```bash
 curl -fsSL https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install-macos.sh | bash
 ```
 
-安装完成后在「应用程序」里双击 **DeepSeek Harness** 即可；想放 Dock 就从 Finder 拖进去。没装 Node.js 时会询问是否用 Homebrew 自动安装。
+安装完成后在「应用程序」里双击 **DeepSeek Harness** 即可；想放 Dock 就从 Finder 拖进去。没装 Node.js 时会引导用 Homebrew 自动安装。
 
 > 国内访问 jsDelivr 不稳时，把命令里的 `https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install.ps1` 换成 `https://raw.githubusercontent.com/becomeless/dsh-desktop-launcher/main/install.ps1` 即可（安装脚本内部下载也会自动回退）。
 
@@ -123,4 +130,4 @@ One-liner install on Windows (PowerShell):
 
 Double-click the desktop icon it creates → DeepSeek Harness starts silently and opens in a Chrome app window. Close the window to stop the server; sessions persist locally and resume next launch. Requires Windows 10/11, Node.js, and a DeepSeek API key (`DEEPSEEK_API_KEY` or the in-app model settings). Uninstall via `uninstall.ps1` in the install directory. Community tool, not affiliated with DeepSeek.
 
-macOS: `curl -fsSL https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install-macos.sh | bash` — installs a double-clickable `.app` into Applications (community-tested).
+macOS: `brew tap becomeless/dsh-desktop-launcher && brew install --cask dsh-desktop-launcher` — installs a double-clickable `.app` into Applications (community-tested). Script alternative: `curl -fsSL https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install-macos.sh | bash`.
