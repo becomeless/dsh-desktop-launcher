@@ -1,8 +1,8 @@
 # DeepSeek Harness Desktop Launcher 🐳
 
-Windows 桌面启动器 for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)：**双击桌面图标 → 自动启动服务 → 弹出 Chrome 独立应用窗口**，全程没有任何命令行黑窗，关掉窗口即自动停服，再次双击无缝续聊。
+Windows 与 macOS 的桌面启动器 for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)：**双击桌面图标 → 自动启动服务 → 弹出 Chrome 独立应用窗口**，全程没有任何命令行黑窗，关掉窗口即自动停服，再次双击无缝续聊。
 
-![license](https://img.shields.io/badge/license-MIT-blue) ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)
+![license](https://img.shields.io/badge/license-MIT-blue) ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20%C2%B7%20macOS%2011%2B-lightgrey)
 
 ## ✨ 特性
 
@@ -12,7 +12,8 @@ Windows 桌面启动器 for [DeepSeek Harness](https://github.com/deepseek-ai/de
 - 🧹 **关窗即停**：关闭应用窗口自动结束后台服务，不留残留进程
 - 🩺 **友好报错**：缺 Node.js / 启动失败都会弹窗提示，日志写 `%TEMP%\DSH-Server.log`
 - 🌐 **双浏览器**：优先 Chrome，没有自动回退 Edge
-- 🚫 无需管理员权限，安装目录 `%LOCALAPPDATA%\DeepSeek-Harness-Launcher`
+- 🍎 **macOS 支持（Beta）**：同名 `.app` 版本，双击即用，逻辑与 Windows 版一致（欢迎 Mac 用户测试反馈）
+- 🚫 无需管理员权限，安装目录 `%LOCALAPPDATA%\DeepSeek-Harness-Launcher`（macOS 为 `~/Library/Application Support/DeepSeek-Harness-Launcher`）
 
 ## 🚀 一键安装
 
@@ -29,6 +30,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager
 ```
 
 没装 Node.js 时，安装脚本会询问是否用 winget 自动安装；不想装也可以手动去 [nodejs.org](https://nodejs.org) 装好后重跑。
+
+**macOS（Beta）：**
+
+```bash
+curl -fsSL https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install-macos.sh | bash
+```
+
+安装完成后在「应用程序」里双击 **DeepSeek Harness** 即可；想放 Dock 就从 Finder 拖进去。没装 Node.js 时会询问是否用 Homebrew 自动安装。
 
 > 国内访问 jsDelivr 不稳时，把命令里的 `https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install.ps1` 换成 `https://raw.githubusercontent.com/becomeless/dsh-desktop-launcher/main/install.ps1` 即可（安装脚本内部下载也会自动回退）。
 
@@ -64,7 +73,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager
 ## 🧱 系统要求
 
 - Windows 10 / 11
+- macOS 11+（Beta）
 - [Node.js](https://nodejs.org)（提供 npx）
+- Chrome 或 Edge（Windows 自带 Edge；macOS 需自行安装其一）
 - 网络（首次运行自动下载 DeepSeek Harness）
 
 ## ❓ FAQ
@@ -75,17 +86,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager
 
 **怎么更新？** 重新跑一遍安装命令即可（会覆盖安装目录并刷新图标）。
 
+**macOS 能用吗？** Beta 支持。作者在 Windows 环境开发，macOS 版未经真机测试；有问题欢迎提 issue 并附上日志（`$TMPDIR/DSH-Server.log`）。
+
 **和官方 DeepSeek Harness 什么关系？** 本工具只是官方的 Windows 桌面入口，启动的仍是官方 `npx @deepseek-ai/dsh web`，不修改、不替代官方任何组件。
 
 ## 📁 项目结构
 
 ```
 install.ps1          一键安装（下载 + 创建桌面图标）
-uninstall.ps1        卸载
+install-macos.sh     macOS 一键安装
+uninstall.ps1        卸载（Windows）
 DSH-Launcher.vbs     无窗口启动入口（快捷方式指向它）
 DSH-Launcher.ps1     启动器主逻辑
 DSH-Server.ps1       静默后台服务进程
 DeepSeek-blue.ico    桌面图标
+mac/                 macOS 版素材（启动脚本 / Info.plist / AppIcon.icns）
 ```
 
 ## ⚠️ 商标与免责声明
@@ -107,3 +122,5 @@ One-liner install on Windows (PowerShell):
 ```
 
 Double-click the desktop icon it creates → DeepSeek Harness starts silently and opens in a Chrome app window. Close the window to stop the server; sessions persist locally and resume next launch. Requires Windows 10/11, Node.js, and a DeepSeek API key (`DEEPSEEK_API_KEY` or the in-app model settings). Uninstall via `uninstall.ps1` in the install directory. Community tool, not affiliated with DeepSeek.
+
+macOS (beta): `curl -fsSL https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/install-macos.sh | bash` — installs a double-clickable `.app` into Applications. Note: developed and tested on Windows; the macOS build needs community testing.
