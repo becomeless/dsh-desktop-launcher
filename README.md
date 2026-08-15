@@ -10,6 +10,7 @@ Windows 与 macOS 的桌面启动器 for [DeepSeek Harness](https://github.com/d
 - 🪟 **零黑窗**：对 Windows Terminal / 服务窗口做了无窗口化处理，只出现浏览器窗口
 - 🔁 **断点续聊**：会话保存在本机，重启服务后对话无缝继续
 - 🧹 **关窗即停**：关闭应用窗口自动结束后台服务，不留残留进程
+- 🛡️ **端口自适应**：首选端口被系统保留（Hyper-V/WSL2 排除端口段）或被占用时，自动换用备用端口，无需手动干预
 - 🩺 **友好报错**：缺 Node.js / 启动失败都会弹窗提示，日志写 `%TEMP%\DSH-Server.log`
 - 🌐 **双浏览器**：优先 Chrome，没有自动回退 Edge
 - 🍎 **macOS 支持**：同名 `.app` 版本，双击即用，逻辑与 Windows 版一致（已真机实测）
@@ -75,7 +76,10 @@ curl -fsSL https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/inst
 | `$PreferredBrowser` | `'chrome'` | 首选浏览器，`'chrome'` / `'edge'`，找不到自动回退另一个 |
 | `$StartupTimeoutSec` | `180` | 等待服务就绪的超时秒数（首次下载依赖时可放宽） |
 | `$ServerWindowStyle` | `'Hidden'` | 服务窗口样式，`Hidden` / `Minimized` |
-| `$DshUrl` / `$DshPort` | `http://127.0.0.1:3080` | 服务地址 |
+| `$DshPort` | `3080` | 首选服务端口；被系统保留或被占用时自动改用备用端口 |
+| `$FallbackPorts` | `8080, 18080, 18081, 30800, 33080` | 备用端口列表（按顺序尝试） |
+
+> macOS 版同理：编辑 `.app` 内的 `Contents/MacOS/launcher`，顶部有 `PORT` 和 `PORT_FALLBACK`。
 
 ## 🧱 系统要求
 
@@ -89,7 +93,15 @@ curl -fsSL https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/inst
 
 **双击没反应？** 看任务栏/通知，或查看日志 `C:\Users\<你>\AppData\Local\Temp\DSH-Server.log`。
 
-**启动报错弹窗？** 弹窗里会带日志尾部内容；常见原因：没装 Node、网络问题、3080 端口被占用。
+**启动报错弹窗？** 弹窗里会带日志尾部内容；常见原因：没装 Node、网络问题、端口被占用（端口问题新版会自动换备用端口）。
+
+**报错 `listen EACCES: permission denied 127.0.0.1:3080`？** 这是 Windows 把 3080 划进了系统保留端口段（Hyper-V/WSL2/WinNAT 的动态端口排除，常见 3002–3101），普通程序无权监听，而不是普通"端口被占用"。新版启动器会自动换用备用端口；想一劳永逸用回 3080，在管理员 PowerShell 里执行：
+
+```powershell
+netsh int ipv4 set dynamicport tcp start=49152 num=16384
+net stop winnat
+net start winnat
+```
 
 **怎么更新？** 重新跑一遍安装命令即可（会覆盖安装目录并刷新图标）。
 
