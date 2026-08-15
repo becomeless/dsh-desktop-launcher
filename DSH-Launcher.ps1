@@ -162,17 +162,26 @@ try {
             $startedOk = $false
             while ($true) {
                 if (Test-DshPort -Port $p) { $startedOk = $true; break }
-                if (Test-Path -LiteralPath $failMarker -or $serverProc.HasExited) { break }
+                if ((Test-Path -LiteralPath $failMarker) -or $serverProc.HasExited) { break }
                 if ((Get-Date) -ge $deadline) {
-                    throw ('等待服务就绪超时（' + $StartupTimeoutSec + ' 秒）。日志：' + $logPath + "`r`n`r`n" + (Get-LogTail -Path $logPath))
+                    $altLog = Join-Path $env:TEMP ("DSH-Server-" + $serverProc.Id + ".log")
+                    $errLog = $logPath
+                    if (Test-Path -LiteralPath $altLog) { $errLog = $altLog }
+                    throw ('等待服务就绪超时（' + $StartupTimeoutSec + ' 秒）。日志：' + $errLog + "`r`n`r`n" + (Get-LogTail -Path $errLog))
                 }
                 Start-Sleep -Milliseconds 800
             }
             if ($startedOk) { $chosenPort = $p; break }
             # 这个端口起不来（被系统保留或启动瞬间被抢占），收尾后试下一个
-            taskkill.exe /PID $serverProc.Id /T /F 2>$null | Out-Null
+            # 注意：不能用 `taskkill ... 2>$null`——PowerShell 5.1 在
+            # $ErrorActionPreference='Stop' 下会把失败时的 stderr 变成终止性异常；
+            # 由 cmd 内部重定向则完全不经过 PowerShell 的错误流。
+            cmd.exe /c "taskkill /PID $($serverProc.Id) /T /F >nul 2>&1"
+            $altLog = Join-Path $env:TEMP ("DSH-Server-" + $serverProc.Id + ".log")
+            $errLog = $logPath
+            if (Test-Path -LiteralPath $altLog) { $errLog = $altLog }
+            $lastFailLog = Get-LogTail -Path $errLog
             $serverProc = $null
-            $lastFailLog = Get-LogTail -Path $logPath
         }
         if ($chosenPort -eq 0) {
             $msg = 'DSH 服务启动失败：候选端口（' + ($portCandidates -join ', ') + '）都被系统保留或被占用。'
@@ -201,13 +210,13 @@ try {
         if (-not $appProc.HasExited) {
             $appProc.WaitForExit()
             Start-Sleep -Milliseconds 500
-            taskkill.exe /PID $serverProc.Id /T /F 2>$null | Out-Null
+            cmd.exe /c "taskkill /PID $($serverProc.Id) /T /F >nul 2>&1"
         }
     }
 } catch {
     Show-Msg -Text ("启动失败：`r`n`r`n" + $_.Exception.Message)
     if ($serverStartedHere -and $serverProc) {
-        taskkill.exe /PID $serverProc.Id /T /F 2>$null | Out-Null
+        cmd.exe /c "taskkill /PID $($serverProc.Id) /T /F >nul 2>&1"
     }
     exit 1
 }
