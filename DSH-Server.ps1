@@ -40,7 +40,9 @@ Get-ChildItem -LiteralPath $env:TEMP -Filter 'DSH-Server-*.log' -ErrorAction Sil
     Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) } |
     Remove-Item -Force -ErrorAction SilentlyContinue
 
-npx --yes @deepseek-ai/dsh web --port $Port *>> $logPath
+# --no-open：新版 dsh web 默认会自动打开系统默认浏览器，
+# 与启动器用 --app 打开的独立窗口重复；这里关掉，只保留应用窗口。
+npx --yes @deepseek-ai/dsh web --no-open --port $Port *>> $logPath
 
 Set-Content -LiteralPath $failMarker -Value 'exited' -Encoding ASCII
 Add-Content -LiteralPath $logPath -Value ("`r`n--- DSH 服务已停止（退出码 " + $LASTEXITCODE + "）---`r`n") -Encoding UTF8

@@ -142,7 +142,9 @@ if [ "$lock_acquired" -eq 1 ] && [ -z "$chosen" ]; then
     port_open "$p" && continue
     chosen="$p"
     rm -f "$MARKER"
-    nohup npx --yes @deepseek-ai/dsh web --port "$p" >>"$LOG" 2>&1 &
+    # --no-open：新版 dsh web 默认自动打开系统默认浏览器，与启动器
+    # 用 --app 打开的独立窗口重复；关掉它，只保留应用窗口。
+    nohup npx --yes @deepseek-ai/dsh web --no-open --port "$p" >>"$LOG" 2>&1 &
     server_pid=$!
     echo "$server_pid" > "$PIDFILE"
     ok=0
