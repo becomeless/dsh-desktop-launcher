@@ -8,6 +8,17 @@
 #  "关窗停服"只针对由本启动器管理的服务（通过 $TMPDIR/DSH-Server.pid
 #  识别归属；手动启动的服务不会被停掉）。
 #  日志：$TMPDIR/DSH-Server.log（上一次运行保留为 .old）
+#  新版 dsh web 启用浏览器 token 认证：打开前从日志解析本次进程的
+#  启动 token 拼到地址后面（不带 token 访问会返回 401"需要认证"页）。
+#  应用窗口用独立浏览器配置目录（~/Library/Application Support/
+#  DSH-Launcher/chrome-profile 或 edge-profile）：同 profile 下 --app
+#  新进程可能被浏览器的单例机制转交给日常实例后自己退出，独立 profile
+#  才能保证窗口真正独立常驻，"关窗停服"和去重看护都依赖这一点；顺带让
+#  token 换来的会话 Cookie 不受日常浏览器清 Cookie 影响。同时带上
+#  --disable-background-mode：Chrome 的后台模式若被打开，关窗后进程可能
+#  不退出，导致关窗看护的 pgrep 永远匹配到、"关窗停服"失效。
+#  上述看护/去重的 pgrep 匹配串故意不带 token（token 含 ? 在 ERE 里是
+#  量词而非字面量，且带 token 匹配会因两个启动器实例读取时机不同而误判）。
 # =====================================================================
 set -uo pipefail
 
@@ -27,6 +38,29 @@ alert() {  # alert <标题> <内容>
 }
 
 log_tail() { tail -n 10 "$LOG" 2>/dev/null || true; }
+
+launch_token() {  # 新版 dsh web（0.1.2-rc.1 起）的浏览器 token 认证：每个服务
+                  # 进程启动时随机生成 token，只打印在日志 "dsh web:" 行里；
+                  # 不带 token 访问根路径返回 401（"需要认证"页）。解析不到
+                  # 就返回空（此前换过 30 天会话 Cookie 时仍能直接打开）。
+  local port="${1:-$PORT}" i tok=""
+  for i in 1 2 3; do   # 日志落盘可能略晚于端口就绪，最多重试 3 次
+    tok=$(grep -Eo "127\.0\.0\.1:$port/\?token=[A-Za-z0-9_-]+" "$LOG" 2>/dev/null | tail -n 1 | sed -E 's/.*token=//')
+    [ -n "$tok" ] && { printf '%s' "$tok"; return 0; }
+    [ "$i" -lt 3 ] && sleep 0.5
+  done
+}
+
+token_valid() {  # 陈旧 token 兜底：服务是手动起的（token 没进启动器日志）或
+                  # 日志里混进了旧进程残留的 token 时，带错误 token 反而可能
+                  # 连原本能用的会话 Cookie 都绕不过。发一次独立请求验证，
+                  # 401 判定为无效；请求本身失败（超时等）不因此丢弃 token。
+  local url="$1" code
+  code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 3 "$url" 2>/dev/null)
+  # curl 本身失败（超时/连接被拒等，http_code 为空或 000）不因此丢弃 token
+  if [ -z "$code" ] || [ "$code" = "000" ]; then return 0; fi
+  [ "$code" != "401" ]
+}
 
 port_open() { nc -z 127.0.0.1 "${1:-$PORT}" >/dev/null 2>&1; }
 
@@ -179,9 +213,24 @@ if [ "$lock_acquired" -eq 1 ] && [ -z "$chosen" ]; then
 fi
 
 URL="http://127.0.0.1:$chosen"
+# 新版 dsh web 的浏览器认证：拼上本次服务进程的启动 token 换取会话 Cookie。
+# 注意 URL（不带 token）单独留着给下面的 pgrep 去重/看护用——带 token 的话
+# ?  在 ERE 里是量词不是字面量，且主/次实例读到 token 的时机不保证一致，
+# 用带 token 的串做匹配会引入误判（重复开窗）。实际打开浏览器用 OPEN_URL。
+TOKEN=$(launch_token "$chosen")
+# 陈旧 token 兜底：服务是手动起的（token 没进日志）或日志里混进旧进程
+# 残留的 token 时，带错误 token 反而可能连原本能用的会话 Cookie 都绕不过
+[ -n "$TOKEN" ] && ! token_valid "$URL/?token=$TOKEN" && TOKEN=""
+OPEN_URL="$URL"
+[ -n "$TOKEN" ] && OPEN_URL="$URL/?token=$TOKEN"
+
+# pgrep -f 按正则匹配整条命令行；只锚定协议+IP+端口，且用 [^0-9] 卡住
+# 端口号尾部（避免 3080 误匹配到 30800 这类以它为前缀的端口）。macOS
+# 的 BSD 正则不支持 \b，所以用字符类模拟"数字边界"。
+PORT_PAT="http://127\\.0\\.0\\.1:${chosen}([^0-9]|\$)"
 
 # 已有应用窗口（如主实例刚打开）时，第二个实例直接退出，不重复开窗
-if [ "$lock_acquired" -ne 1 ] && pgrep -f -- "--app=$URL" >/dev/null 2>&1; then
+if [ "$lock_acquired" -ne 1 ] && pgrep -f -- "--app=$PORT_PAT" >/dev/null 2>&1; then
   exit 0
 fi
 
@@ -204,25 +253,31 @@ for b in "$CHROME" "$EDGE"; do
   if [[ -x "$b" ]]; then BROWSER="$b"; break; fi
 done
 if [[ -z "$BROWSER" ]]; then
-  open "$URL"   # 没有 Chrome/Edge 就用默认浏览器打开
+  open "$OPEN_URL"   # 没有 Chrome/Edge 就用默认浏览器打开
   # 默认浏览器无法感知关窗，服务会保持运行（已知取舍）
   exit 0
 fi
 APPNAME=""
+PROFILE_DIR=""
 case "$BROWSER" in
-  *"Google Chrome"*) APPNAME="Google Chrome" ;;
-  *"Microsoft Edge"*) APPNAME="Microsoft Edge" ;;
+  *"Google Chrome"*) APPNAME="Google Chrome"; PROFILE_DIR="$HOME/Library/Application Support/DSH-Launcher/chrome-profile" ;;
+  *"Microsoft Edge"*) APPNAME="Microsoft Edge"; PROFILE_DIR="$HOME/Library/Application Support/DSH-Launcher/edge-profile" ;;
 esac
-open -na "$APPNAME" --args --app="$URL"
+# 独立浏览器配置目录：同 profile 下 --app 新进程可能被 Chrome 的
+# ProcessSingleton 转交给已在运行的日常实例后自己退出，导致 pgrep 看护
+# 落空、关窗停服失效；独立 profile 才能保证 --app 进程真正独立常驻，
+# 同时让 token 换来的 30 天会话 Cookie 不受日常浏览器清 Cookie 影响。
+mkdir -p "$PROFILE_DIR"
+open -na "$APPNAME" --args --app="$OPEN_URL" --user-data-dir="$PROFILE_DIR" --no-first-run --disable-background-mode
 sleep 3
-if ! pgrep -f -- "--app=$URL" >/dev/null 2>&1; then
-  open "$URL"   # 应用窗口没起来（如被拦截），退回默认浏览器
+if ! pgrep -f -- "--app=$PORT_PAT" >/dev/null 2>&1; then
+  open "$OPEN_URL"   # 应用窗口没起来（如被拦截），退回默认浏览器
   exit 0
 fi
 
 # ---- 3) 应用窗口关闭后，停掉由本启动器管理的服务 ----
 if [[ -n "$OWNED_PID" && $STOP_ON_CLOSE -eq 1 ]]; then
-  while pgrep -f -- "--app=$URL" >/dev/null 2>&1; do
+  while pgrep -f -- "--app=$PORT_PAT" >/dev/null 2>&1; do
     sleep 2
   done
   sleep 1

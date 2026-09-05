@@ -12,6 +12,10 @@
 #         第一个实例拉起的服务，不会重复启动。
 #    2) 等待服务 HTTP 就绪（而不是端口通了就开浏览器，避免白屏）
 #    3) 用 Chrome 的"应用模式"（--app，无地址栏的独立窗口）打开。
+#       打开前会从服务日志解析本次进程的启动 token 拼到地址后面：
+#       新版 dsh web（0.1.2-rc.1 起）启用了浏览器 token 认证，每个服务
+#       进程启动时随机生成 token 且只打印在日志里，不带 token 访问根
+#       路径会返回 401（表现为"需要认证"页面）。
 #       窗口使用独立的浏览器配置目录（chrome-profile / edge-profile）：
 #       Chrome/Edge 是单例模型，若浏览器已在运行，新进程会把窗口交给
 #       现有进程后立即退出，导致无法感知关窗；独立配置目录强制新实例，
@@ -48,6 +52,62 @@ function Get-LogTail {
     if (-not (Test-Path -LiteralPath $Path)) { return '' }
     try { return ((Get-Content -LiteralPath $Path -Tail $Lines -ErrorAction SilentlyContinue) -join "`r`n") }
     catch { return '' }
+}
+
+function Get-LaunchToken {
+    # 新版 dsh web 的浏览器 token 认证：每个服务进程启动时随机生成 token，
+    # 只打印在日志的 "dsh web: http://127.0.0.1:端口/?token=..." 行里；
+    # 浏览器访问带 token 的地址会换取 30 天有效的会话 Cookie。这里从当前
+    # 服务的日志解析 token，解析不到返回空串（此前换过 Cookie 时仍能打开）。
+    param([int]$Port, [int]$OwnedPid = 0)
+    $logs = @()
+    # 已知服务归属 PID 时，它专属的日志（主日志被锁时才会产生）最权威，优先查
+    if ($OwnedPid -ne 0) {
+        $ownedLog = Join-Path $env:TEMP ("DSH-Server-" + $OwnedPid + ".log")
+        if (Test-Path -LiteralPath $ownedLog) { $logs += $ownedLog }
+    }
+    $logs += (Join-Path $env:TEMP 'DSH-Server.log')
+    # 主日志被锁时服务会改写 DSH-Server-<PID>.log，一并纳入（按修改时间倒序）
+    $logs += Get-ChildItem -LiteralPath $env:TEMP -Filter 'DSH-Server-*.log' -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        ForEach-Object { $_.FullName }
+    foreach ($log in $logs) {
+        if (-not (Test-Path -LiteralPath $log)) { continue }
+        $text = Get-Content -LiteralPath $log -Raw -ErrorAction SilentlyContinue
+        if (-not $text) { continue }
+        # 日志里 token 可能不止一次出现（如重试打印），取最后一条（当前进程）
+        $found = [regex]::Matches($text, "127\.0\.0\.1:$Port/\?token=([A-Za-z0-9_\-]+)")
+        if ($found.Count -gt 0) { return $found[$found.Count - 1].Groups[1].Value }
+    }
+    return ''
+}
+
+function Get-HttpStatusFromError {
+    # Windows PowerShell 5.1 的 Invoke-WebRequest 对 HTTP 错误状态码抛
+    # System.Net.WebException（.Response 是 HttpWebResponse）；PowerShell 7
+    # 换成了基于 HttpClient 的实现，抛的是 Microsoft.PowerShell.Commands.
+    # HttpResponseException（.Response 是 HttpResponseMessage）。两者类型
+    # 不同但都有 .Response.StatusCode，这里不按异常类型分支，只鸭子类型
+    # 地探测 .Response.StatusCode 是否存在，兼容两个版本。
+    param($ErrorRecord)
+    $response = $ErrorRecord.Exception.Response
+    if ($response -and $response.StatusCode) { return [int]$response.StatusCode }
+    return $null
+}
+
+function Test-LaunchToken {
+    # 陈旧 token 兜底：服务是手动起的（token 没进启动器日志）或日志里
+    # 混进了旧进程残留的 token 时，带错误 token 访问反而可能连原本能用
+    # 的会话 Cookie 都绕不过。这里发一次独立请求验证，401 就丢弃 token。
+    param([string]$Url)
+    try {
+        $resp = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+        return ($resp.StatusCode -ne 401)
+    } catch {
+        $status = Get-HttpStatusFromError -ErrorRecord $_
+        if ($null -ne $status) { return ($status -ne 401) }
+        return $true   # 网络异常等取不到状态码的失败，不因验证请求本身的问题丢弃 token
+    }
 }
 
 function Test-DshPort {
@@ -123,15 +183,15 @@ function Test-DshWeb {
 }
 
 function Test-HttpReady {
-    # 服务已能响应 HTTP（任意响应码都算就绪；连接被拒才是未就绪）
+    # 服务已能响应 HTTP（任意响应码都算就绪；连接被拒才是未就绪）。
+    # 不按异常类型分支（PS 5.1 抛 WebException，PS7 抛 HttpResponseException），
+    # 只看有没有拿到 Response——两个版本的错误对象都有这个属性。
     param([int]$Port)
     try {
         Invoke-WebRequest -Uri "http://127.0.0.1:$Port/" -UseBasicParsing -TimeoutSec 3 | Out-Null
         return $true
-    } catch [System.Net.WebException] {
-        return ($null -ne $_.Exception.Response)
     } catch {
-        return $false
+        return ($null -ne $_.Exception.Response)
     }
 }
 
@@ -314,7 +374,23 @@ try {
 
     $DshUrl = "http://127.0.0.1:$chosenPort"
 
-    # 2) 用应用模式打开（独立浏览器配置目录）
+    # 2) 拼上本次服务进程的启动 token（新版 dsh web 的浏览器认证）。
+    #    token 打印在日志里，日志落盘可能略晚于端口就绪，最多重试 3 次；
+    #    解析不到（如手动启动的老版本服务）就按原样打开，靠已有 Cookie 兜底。
+    $launchToken = ''
+    for ($i = 1; $i -le 3; $i++) {
+        $launchToken = Get-LaunchToken -Port $chosenPort -OwnedPid $ownedServerPid
+        if ($launchToken) { break }
+        if ($i -lt 3) { Start-Sleep -Milliseconds 500 }
+    }
+    # 陈旧 token 兜底：日志里解析到的可能是手动启动的服务残留的旧进程 token，
+    # 带错误 token 反而可能连原本能用的会话 Cookie 都绕不过；验证一下再用。
+    if ($launchToken -and -not (Test-LaunchToken -Url "$DshUrl/?token=$launchToken")) {
+        $launchToken = ''
+    }
+    if ($launchToken) { $DshUrl = "$DshUrl/?token=$launchToken" }
+
+    # 3) 用应用模式打开（独立浏览器配置目录）
     $browserExe = Find-BrowserExe -Name $PreferredBrowser
     if (-not $browserExe) {
         $other = 'chrome'
@@ -334,7 +410,7 @@ try {
     $appProc = Start-Process -FilePath $browserExe -PassThru `
         -ArgumentList "--app=$DshUrl --user-data-dir=`"$profileDir`" --no-first-run --disable-background-mode"
 
-    # 3) 应用窗口关闭后，自动停掉由本启动器管理的服务
+    # 4) 应用窗口关闭后，自动停掉由本启动器管理的服务
     if ($ownedServerPid -ne 0 -and $StopServerWhenAppCloses) {
         Start-Sleep -Seconds 3
         if (-not $appProc.HasExited) {

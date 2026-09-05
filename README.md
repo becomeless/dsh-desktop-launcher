@@ -98,7 +98,9 @@ curl -fsSL https://cdn.jsdelivr.net/gh/becomeless/dsh-desktop-launcher@main/inst
 
 **第一次打开很慢？** 启动器每次启动都会通过 npx 检查并拉取最新版 dsh（官方目前几乎每天发版），命中新版时会重新下载全部依赖，慢属正常现象。想固定版本，可把 `DSH-Server.ps1` 里的 `npx --yes @deepseek-ai/dsh web` 改成带版本号的形式（如 `@deepseek-ai/dsh@0.1.0-rc.7`）。
 
-**应用窗口和我日常的 Chrome 是同一个吗？** 不是：应用窗口使用安装目录下的独立浏览器配置（`chrome-profile` / `edge-profile`），与日常浏览互不影响，这也是"关窗能可靠停服"的前提。
+**打开后提示"需要认证"或 401？** 新版 dsh web（0.1.2-rc.1 起）启用了浏览器 token 认证：每次服务启动都会生成新的启动 token（打印在 `DSH-Server.log` 的 `dsh web:` 行里），浏览器访问带 token 的地址后会换取 30 天有效的会话 Cookie。新版启动器会自动解析并拼上 token；如果你看到这个页面，说明启动器是旧版本，更新启动器即可，或者手动打开日志里那行带 `?token=...` 的地址。
+
+**应用窗口和我日常的 Chrome 是同一个吗？** 不是：应用窗口使用独立的浏览器配置目录（Windows 在安装目录下的 `chrome-profile` / `edge-profile`；macOS 在 `~/Library/Application Support/DSH-Launcher/`），与日常浏览互不影响，这也是"关窗能可靠停服"的前提。
 
 **报错 `listen EACCES: permission denied 127.0.0.1:3080`？** 这是 Windows 把 3080 划进了系统保留端口段（Hyper-V/WSL2/WinNAT 的动态端口排除，常见 3002–3101），普通程序无权监听，而不是普通"端口被占用"。新版启动器会自动换用备用端口；想一劳永逸用回 3080，在管理员 PowerShell 里执行：
 
